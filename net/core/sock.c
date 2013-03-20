@@ -582,9 +582,25 @@ static int sock_getbindtodevice(struct sock *sk, char __user *optval,
 	if (len < IFNAMSIZ)
 		goto out;
 
+<<<<<<< HEAD
 	ret = netdev_get_name(net, devname, sk->sk_bound_dev_if);
 	if (ret)
 		goto out;
+=======
+	mutex_lock(&devnet_rename_mutex);
+	rcu_read_lock();
+	dev = dev_get_by_index_rcu(net, sk->sk_bound_dev_if);
+	ret = -ENODEV;
+	if (!dev) {
+		rcu_read_unlock();
+		mutex_unlock(&devnet_rename_mutex);
+		goto out;
+	}
+
+	strcpy(devname, dev->name);
+	rcu_read_unlock();
+	mutex_unlock(&devnet_rename_mutex);
+>>>>>>> net: make devnet_rename_seq a mutex
 
 	len = strlen(devname) + 1;
 

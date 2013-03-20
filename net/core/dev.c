@@ -166,7 +166,7 @@ static struct list_head offload_base __read_mostly;
 DEFINE_RWLOCK(dev_base_lock);
 EXPORT_SYMBOL(dev_base_lock);
 
-seqcount_t devnet_rename_seq;
+DEFINE_MUTEX(devnet_rename_mutex);
 
 static inline void dev_base_seq_inc(struct net *net)
 {
@@ -804,23 +804,19 @@ EXPORT_SYMBOL(dev_get_by_index);
 int netdev_get_name(struct net *net, char *name, int ifindex)
 {
 	struct net_device *dev;
-	unsigned int seq;
 
-retry:
-	seq = raw_seqcount_begin(&devnet_rename_seq);
+	mutex_lock(&devnet_rename_mutex);
 	rcu_read_lock();
 	dev = dev_get_by_index_rcu(net, ifindex);
 	if (!dev) {
 		rcu_read_unlock();
+		mutex_unlock(&devnet_rename_mutex);
 		return -ENODEV;
 	}
 
 	strcpy(name, dev->name);
 	rcu_read_unlock();
-	if (read_seqcount_retry(&devnet_rename_seq, seq)) {
-		cond_resched();
-		goto retry;
-	}
+	mutex_unlock(&devnet_rename_mutex);
 
 	return 0;
 }
@@ -1084,10 +1080,11 @@ int dev_change_name(struct net_device *dev, const char *newname)
 	if (dev->flags & IFF_UP)
 		return -EBUSY;
 
-	write_seqcount_begin(&devnet_rename_seq);
+
+	mutex_lock(&devnet_rename_mutex);
 
 	if (strncmp(newname, dev->name, IFNAMSIZ) == 0) {
-		write_seqcount_end(&devnet_rename_seq);
+		mutex_unlock(&devnet_rename_mutex);
 		return 0;
 	}
 
@@ -1095,7 +1092,7 @@ int dev_change_name(struct net_device *dev, const char *newname)
 
 	err = dev_get_valid_name(net, dev, newname);
 	if (err < 0) {
-		write_seqcount_end(&devnet_rename_seq);
+		mutex_unlock(&devnet_rename_mutex);
 		return err;
 	}
 
@@ -1103,11 +1100,11 @@ rollback:
 	ret = device_rename(&dev->dev, dev->name);
 	if (ret) {
 		memcpy(dev->name, oldname, IFNAMSIZ);
-		write_seqcount_end(&devnet_rename_seq);
+		mutex_unlock(&devnet_rename_mutex);
 		return ret;
 	}
 
-	write_seqcount_end(&devnet_rename_seq);
+	mutex_unlock(&devnet_rename_mutex);
 
 	write_lock_bh(&dev_base_lock);
 	hlist_del_rcu(&dev->name_hlist);
@@ -1126,7 +1123,7 @@ rollback:
 		/* err >= 0 after dev_alloc_name() or stores the first errno */
 		if (err >= 0) {
 			err = ret;
-			write_seqcount_begin(&devnet_rename_seq);
+			mutex_lock(&devnet_rename_mutex);
 			memcpy(dev->name, oldname, IFNAMSIZ);
 			goto rollback;
 		} else {
