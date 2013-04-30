@@ -777,6 +777,7 @@ static void timekeeping_resume(void)
 	}
 	/* re-base the last cycle value */
 	tk->clock->cycle_last = tk->clock->read(tk->clock);
+	tk->cycle_last = tk->clock->cycle_last;
 	tk->ntp_error = 0;
 	timekeeping_suspended = 0;
 	timekeeping_update(tk, false, true);
