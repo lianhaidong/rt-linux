@@ -1583,6 +1583,8 @@ asmlinkage int vprintk_emit(int facility, int level,
 	 */
 	if (unlikely(forced_early_printk(fmt, args)))
 		return 1;
+	if (in_nmi())
+		return 1;
 
 	boot_delay_msec(level);
 	printk_delay();
