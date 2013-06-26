@@ -423,7 +423,7 @@ void idr_preload(gfp_t gfp_mask)
 	WARN_ON_ONCE(in_interrupt());
 	might_sleep_if(gfp_mask & __GFP_WAIT);
 
-	preempt_disable();
+	migrate_disable();
 
 	/*
 	 * idr_alloc() is likely to succeed w/o full idr_layer buffer and

@@ -94,7 +94,7 @@ void idr_init(struct idr *idp);
  */
 static inline void idr_preload_end(void)
 {
-	preempt_enable();
+	migrate_enable();
 }
 
 /**
