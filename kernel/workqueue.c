@@ -1053,6 +1053,33 @@ static void put_pwq(struct pool_workqueue *pwq)
 	schedule_work(&pwq->unbound_release_work);
 }
 
+#ifdef CONFIG_PREEMPT_RT_FULL
+/*
+ * RT uses local_lock instead of disabling interrupts.
+ * put_pwq() may grab this lock within the pool lock, which will
+ * reverse the general order. We need to grab it first before
+ * taking the pool lock.
+ */
+static inline void pool_lock_irq(struct pool_workqueue *pwq)
+{
+	local_lock_irq(pendingb_lock);
+	spin_lock(&pwq->pool->lock);
+}
+static inline void pool_unlock_irq(struct pool_workqueue *pwq)
+{
+	spin_unlock_irq(&pwq->pool->lock);
+	local_unlock_irq(pendingb_lock);
+}
+#else
+static inline void pool_lock_irq(struct pool_workqueue *pwq)
+{
+	spin_lock_irq(&pwq->pool->lock);
+}
+static inline void pool_unlock_irq(struct pool_workqueue *pwq)
+{
+	spin_unlock_irq(&pwq->pool->lock);
+}
+#endif
 /**
  * put_pwq_unlocked - put_pwq() with surrounding pool lock/unlock
  * @pwq: pool_workqueue to put (can be %NULL)
@@ -1066,9 +1093,9 @@ static void put_pwq_unlocked(struct pool_workqueue *pwq)
 		 * As both pwqs and pools are sched-RCU protected, the
 		 * following lock operations are safe.
 		 */
-		spin_lock_irq(&pwq->pool->lock);
+		pool_lock_irq(pwq);
 		put_pwq(pwq);
-		spin_unlock_irq(&pwq->pool->lock);
+		pool_unlock_irq(pwq);
 	}
 }
 
