@@ -2766,14 +2766,15 @@ static bool start_flush_work(struct work_struct *work, struct wq_barrier *barr)
 
 	might_sleep();
 
-	local_irq_disable();
+	rcu_read_lock_sched();
+
 	pool = get_work_pool(work);
 	if (!pool) {
-		local_irq_enable();
+		rcu_read_unlock_sched();
 		return false;
 	}
 
-	spin_lock(&pool->lock);
+	spin_lock_irq(&pool->lock);
 	/* see the comment in try_to_grab_pending() with the same code */
 	pwq = get_work_pwq(work);
 	if (pwq) {
@@ -2788,6 +2789,7 @@ static bool start_flush_work(struct work_struct *work, struct wq_barrier *barr)
 
 	insert_wq_barrier(pwq, barr, work, worker);
 	spin_unlock_irq(&pool->lock);
+	rcu_read_unlock_sched();
 
 	/*
 	 * If @max_active is 1 or rescuer is in use, flushing another work
@@ -2804,6 +2806,7 @@ static bool start_flush_work(struct work_struct *work, struct wq_barrier *barr)
 	return true;
 already_gone:
 	spin_unlock_irq(&pool->lock);
+	rcu_read_unlock_sched();
 	return false;
 }
 
@@ -4366,7 +4369,7 @@ unsigned int work_busy(struct work_struct *work)
 	if (work_pending(work))
 		ret |= WORK_BUSY_PENDING;
 
-	local_irq_save(flags);
+	rcu_read_lock_sched();
 	pool = get_work_pool(work);
 	if (pool) {
 		spin_lock(&pool->lock);
@@ -4374,7 +4377,7 @@ unsigned int work_busy(struct work_struct *work)
 			ret |= WORK_BUSY_RUNNING;
 		spin_unlock(&pool->lock);
 	}
-	local_irq_restore(flags);
+	rcu_read_unlock_sched();
 
 	return ret;
 }
