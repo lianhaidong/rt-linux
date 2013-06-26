@@ -1,6 +1,7 @@
 #ifndef _LINUX_LOCALLOCK_H
 #define _LINUX_LOCALLOCK_H
 
+#include <linux/percpu.h>
 #include <linux/spinlock.h>
 
 #ifdef CONFIG_PREEMPT_RT_BASE
