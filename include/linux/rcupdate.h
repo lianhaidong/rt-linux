@@ -36,6 +36,7 @@
 #include <linux/types.h>
 #include <linux/cache.h>
 #include <linux/spinlock.h>
+#include <linux/locallock.h>
 #include <linux/threads.h>
 #include <linux/cpumask.h>
 #include <linux/seqlock.h>
@@ -870,6 +871,28 @@ static inline void rcu_read_unlock_bh(void)
 	local_bh_enable();
 }
 
+/* asm-offsets.c gets confused with local_lock here */
+#if defined(CONFIG_PREEMPT_RT_FULL)
+DECLARE_LOCAL_IRQ_LOCK(rcu_sched_lock);
+static inline void rcu_read_lock_sched_disable(void)
+{
+	local_lock(rcu_sched_lock);
+}
+static inline void rcu_read_lock_sched_enable(void)
+{
+	local_unlock(rcu_sched_lock);
+}
+#else
+static inline void rcu_read_lock_sched_disable(void)
+{
+	preempt_disable();
+}
+static inline void rcu_read_lock_sched_enable(void)
+{
+	preempt_enable();
+}
+#endif
+
 /**
  * rcu_read_lock_sched() - mark the beginning of a RCU-sched critical section
  *
@@ -885,7 +908,7 @@ static inline void rcu_read_unlock_bh(void)
  */
 static inline void rcu_read_lock_sched(void)
 {
-	preempt_disable();
+	rcu_read_lock_sched_disable();
 	__acquire(RCU_SCHED);
 	rcu_lock_acquire(&rcu_sched_lock_map);
 	rcu_lockdep_assert(!rcu_is_cpu_idle(),
@@ -910,7 +933,7 @@ static inline void rcu_read_unlock_sched(void)
 			   "rcu_read_unlock_sched() used illegally while idle");
 	rcu_lock_release(&rcu_sched_lock_map);
 	__release(RCU_SCHED);
-	preempt_enable();
+	rcu_read_lock_sched_enable();
 }
 
 /* Used by lockdep and tracing: cannot be traced, cannot call lockdep. */

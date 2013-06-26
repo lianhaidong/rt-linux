@@ -2491,6 +2491,31 @@ static inline int rcu_blocking_is_gp(void)
 	return ret;
 }
 
+#ifdef CONFIG_PREEMPT_RT_FULL
+DEFINE_LOCAL_IRQ_LOCK(rcu_sched_lock);
+/*
+ * Real-time allows for synchronize sched to sleep but not migrate.
+ * This is done via the local locks. When calling synchronize_sched(),
+ * all the local locks need to be taken and released. This will ensure
+ * that all users of rcu_read_lock_sched() will be out of their critical
+ * sections at the completion of this function. synchronize_sched() will
+ * still perform the normal RCU sched operations to synchronize with
+ * locations that use disabling preemption or interrupts.
+ */
+static void rcu_synchronize_sched_rt(void)
+{
+	int cpu;
+
+	for_each_possible_cpu(cpu) {
+		spin_lock(&per_cpu(rcu_sched_lock, cpu).lock);
+		spin_unlock(&per_cpu(rcu_sched_lock, cpu).lock);
+	}
+}
+#else
+static inline void rcu_synchronize_sched_rt(void)
+{
+}
+#endif
 /**
  * synchronize_sched - wait until an rcu-sched grace period has elapsed.
  *
@@ -2538,6 +2563,9 @@ void synchronize_sched(void)
 			   !lock_is_held(&rcu_lock_map) &&
 			   !lock_is_held(&rcu_sched_lock_map),
 			   "Illegal synchronize_sched() in RCU-sched read-side critical section");
+
+	rcu_synchronize_sched_rt();
+
 	if (rcu_blocking_is_gp())
 		return;
 	if (rcu_expedited)
