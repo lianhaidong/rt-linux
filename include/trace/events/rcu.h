@@ -17,6 +17,7 @@
  * An "@" character within "<activity>" is a comment character: Data
  * reduction scripts will ignore the "@" and the remainder of the line.
  */
+#if 0
 TRACE_EVENT(rcu_utilization,
 
 	TP_PROTO(char *s),
@@ -33,6 +34,9 @@ TRACE_EVENT(rcu_utilization,
 
 	TP_printk("%s", __entry->s)
 );
+#else
+#define trace_rcu_utilization(foo)
+#endif
 
 #ifdef CONFIG_RCU_TRACE
 
@@ -306,6 +310,7 @@ TRACE_EVENT(rcu_fqs,
  * events use the upper bits of each number, while interrupt-related
  * events use the lower bits.
  */
+#if 0
 TRACE_EVENT(rcu_dyntick,
 
 	TP_PROTO(char *polarity, long long oldnesting, long long newnesting),
@@ -327,6 +332,9 @@ TRACE_EVENT(rcu_dyntick,
 	TP_printk("%s %llx %llx", __entry->polarity,
 		  __entry->oldnesting, __entry->newnesting)
 );
+#else
+#define trace_rcu_dyntick(foo, bar, baz)
+#endif
 
 /*
  * Tracepoint for RCU preparation for idle, the goal being to get RCU
