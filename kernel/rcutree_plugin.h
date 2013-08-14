@@ -2097,9 +2097,13 @@ static void __call_rcu_nocb_enqueue(struct rcu_data *rdp,
 	if (old_rhpp == &rdp->nocb_head) {
 		swait_wake(&rdp->nocb_wq); /* ... only if queue was empty ... */
 		rdp->qlen_last_fqs_check = 0;
+		trace_rcu_nocb_wake(rdp->rsp->name, rdp->cpu, "WakeEmpty");
 	} else if (len > rdp->qlen_last_fqs_check + qhimark) {
 		wake_up_process(t); /* ... or if many callbacks queued. */
 		rdp->qlen_last_fqs_check = LONG_MAX / 2;
+		trace_rcu_nocb_wake(rdp->rsp->name, rdp->cpu, "WakeOvf");
+	} else {
+		trace_rcu_nocb_wake(rdp->rsp->name, rdp->cpu, "WakeNot");
 	}
 	return;
 }
@@ -2216,10 +2220,13 @@ static int rcu_nocb_kthread(void *arg)
 			swait_event_interruptible(rdp->nocb_wq, rdp->nocb_head);
 		list = ACCESS_ONCE(rdp->nocb_head);
 		if (!list) {
+			trace_rcu_nocb_wake(rdp->rsp->name, rdp->cpu,
+					    "WokeEmpty");
 			schedule_timeout_interruptible(1);
 			flush_signals(current);
 			continue;
 		}
+		trace_rcu_nocb_wake(rdp->rsp->name, rdp->cpu, "WokeNonEmpty");
 
 		/*
 		 * Extract queued callbacks, update counts, and wait
