@@ -2220,8 +2220,9 @@ static int rcu_nocb_kthread(void *arg)
 			swait_event_interruptible(rdp->nocb_wq, rdp->nocb_head);
 		list = ACCESS_ONCE(rdp->nocb_head);
 		if (!list) {
-			trace_rcu_nocb_wake(rdp->rsp->name, rdp->cpu,
-					    "WokeEmpty");
+			if (!rcu_nocb_poll)
+				trace_rcu_nocb_wake(rdp->rsp->name, rdp->cpu,
+						    "WokeEmpty");
 			schedule_timeout_interruptible(1);
 			flush_signals(current);
 			continue;
