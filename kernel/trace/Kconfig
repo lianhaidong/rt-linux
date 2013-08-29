@@ -677,7 +677,14 @@ config RING_BUFFER_STARTUP_TEST
 
 	 If unsure, say N
 
+config PREEMPT_TRACE
+	bool "Keep a record of preempt disabled spots"
+	depends on DEBUG_KERNEL
+	depends on PREEMPT
+	select TRACING
+	help
+	  Keeps a record of the last 25 preempt disabled locations.
+
 endif # FTRACE
 
 endif # TRACING_SUPPORT
-
