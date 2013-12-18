@@ -837,7 +837,7 @@ static u32 iwl_pcie_int_cause_non_ict(struct iwl_trans *trans)
 		/* Hardware disappeared. It might have already raised
 		 * an interrupt */
 		IWL_WARN(trans, "HARDWARE GONE?? INTA == 0x%08x\n", inta);
-		return trans_pcie->inta;
+		return inta;
 	}
 
 	if (iwl_have_debug_level(IWL_DL_ISR))
@@ -846,19 +846,17 @@ static u32 iwl_pcie_int_cause_non_ict(struct iwl_trans *trans)
 			      inta, trans_pcie->inta_mask,
 			      iwl_read32(trans, CSR_FH_INT_STATUS));
 
-	trans_pcie->inta |= inta;
 	/* the thread will service interrupts and re-enable them */
 	if (likely(inta))
-		return trans_pcie->inta;
+		return inta;
 
 none:
 	/* re-enable interrupts here since we don't have anything to service. */
 	/* only Re-enable if disabled by irq  and no schedules tasklet. */
-	if (test_bit(STATUS_INT_ENABLED, &trans_pcie->status) &&
-	    !trans_pcie->inta)
+	if (test_bit(STATUS_INT_ENABLED, &trans_pcie->status) && !inta)
 		iwl_enable_interrupts(trans);
 
-	return trans_pcie->inta;
+	return inta;
 }
 
 /* a device (PCI-E) page is 4096 bytes long */
@@ -932,21 +930,19 @@ static u32 iwl_pcie_int_cause_ict(struct iwl_trans *trans)
 			      iwl_read32(trans, CSR_INT_MASK));
 
 	inta &= trans_pcie->inta_mask;
-	trans_pcie->inta |= inta;
 
 	/* iwl_pcie_tasklet() will service interrupts and re-enable them */
 	if (likely(inta))
-		return trans_pcie->inta;
+		return inta;
 
  none:
 	/* re-enable interrupts here since we don't have anything to service.
 	 * only Re-enable if disabled by irq.
 	 */
-	if (test_bit(STATUS_INT_ENABLED, &trans_pcie->status) &&
-	    !trans_pcie->inta)
+	if (test_bit(STATUS_INT_ENABLED, &trans_pcie->status) && !inta)
 		iwl_enable_interrupts(trans);
 
-	return trans_pcie->inta;
+	return inta;
 }
 
 irqreturn_t iwl_pcie_irq_handler(int irq, void *dev_id)
@@ -989,14 +985,9 @@ irqreturn_t iwl_pcie_irq_handler(int irq, void *dev_id)
 	 */
 	iwl_write32(trans, CSR_INT, inta | ~trans_pcie->inta_mask);
 
-	inta = trans_pcie->inta;
-
 	if (iwl_have_debug_level(IWL_DL_ISR))
 		IWL_DEBUG_ISR(trans, "inta 0x%08x, enabled 0x%08x\n",
 			      inta, iwl_read32(trans, CSR_INT_MASK));
-
-	/* saved interrupt in inta variable now we can reset trans_pcie->inta */
-	trans_pcie->inta = 0;
 
 	spin_unlock_irqrestore(&trans_pcie->irq_lock, flags);
 
