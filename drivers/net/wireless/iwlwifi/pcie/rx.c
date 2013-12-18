@@ -817,45 +817,6 @@ static u32 iwl_pcie_int_cause_non_ict(struct iwl_trans *trans)
 	/* Discover which interrupts are active/pending */
 	inta = iwl_read32(trans, CSR_INT);
 
-	if (inta & (~trans_pcie->inta_mask)) {
-		IWL_DEBUG_ISR(trans,
-			      "We got a masked interrupt (0x%08x)...Ack and ignore\n",
-			      inta & (~trans_pcie->inta_mask));
-		iwl_write32(trans, CSR_INT, inta & (~trans_pcie->inta_mask));
-		inta &= trans_pcie->inta_mask;
-	}
-
-	/* Ignore interrupt if there's nothing in NIC to service.
-	 * This may be due to IRQ shared with another device,
-	 * or due to sporadic interrupts thrown from our NIC. */
-	if (!inta) {
-		IWL_DEBUG_ISR(trans, "Ignore interrupt, inta == 0\n");
-		goto none;
-	}
-
-	if ((inta == 0xFFFFFFFF) || ((inta & 0xFFFFFFF0) == 0xa5a5a5a0)) {
-		/* Hardware disappeared. It might have already raised
-		 * an interrupt */
-		IWL_WARN(trans, "HARDWARE GONE?? INTA == 0x%08x\n", inta);
-		return inta;
-	}
-
-	if (iwl_have_debug_level(IWL_DL_ISR))
-		IWL_DEBUG_ISR(trans,
-			      "ISR inta 0x%08x, enabled 0x%08x, fh 0x%08x\n",
-			      inta, trans_pcie->inta_mask,
-			      iwl_read32(trans, CSR_FH_INT_STATUS));
-
-	/* the thread will service interrupts and re-enable them */
-	if (likely(inta))
-		return inta;
-
-none:
-	/* re-enable interrupts here since we don't have anything to service. */
-	/* only Re-enable if disabled by irq  and no schedules tasklet. */
-	if (test_bit(STATUS_INT_ENABLED, &trans_pcie->status) && !inta)
-		iwl_enable_interrupts(trans);
-
 	return inta;
 }
 
@@ -886,10 +847,8 @@ static u32 iwl_pcie_int_cause_ict(struct iwl_trans *trans)
 	 * or due to sporadic interrupts thrown from our NIC. */
 	read = le32_to_cpu(trans_pcie->ict_tbl[trans_pcie->ict_index]);
 	trace_iwlwifi_dev_ict_read(trans->dev, trans_pcie->ict_index, read);
-	if (!read) {
-		IWL_DEBUG_ISR(trans, "Ignore interrupt, inta == 0\n");
-		goto none;
-	}
+	if (!read)
+		return 0;
 
 	/*
 	 * Collect all entries up to the first 0, starting from ict_index;
@@ -923,25 +882,6 @@ static u32 iwl_pcie_int_cause_ict(struct iwl_trans *trans)
 		val |= 0x8000;
 
 	inta = (0xff & val) | ((0xff00 & val) << 16);
-	IWL_DEBUG_ISR(trans, "ISR inta 0x%08x, enabled(sw) 0x%08x ict 0x%08x\n",
-		      inta, trans_pcie->inta_mask, val);
-	if (iwl_have_debug_level(IWL_DL_ISR))
-		IWL_DEBUG_ISR(trans, "enabled(hw) 0x%08x\n",
-			      iwl_read32(trans, CSR_INT_MASK));
-
-	inta &= trans_pcie->inta_mask;
-
-	/* iwl_pcie_tasklet() will service interrupts and re-enable them */
-	if (likely(inta))
-		return inta;
-
- none:
-	/* re-enable interrupts here since we don't have anything to service.
-	 * only Re-enable if disabled by irq.
-	 */
-	if (test_bit(STATUS_INT_ENABLED, &trans_pcie->status) && !inta)
-		iwl_enable_interrupts(trans);
-
 	return inta;
 }
 
@@ -967,10 +907,39 @@ irqreturn_t iwl_pcie_irq_handler(int irq, void *dev_id)
 	else
 		inta = iwl_pcie_int_cause_non_ict(trans);
 
+	if (iwl_have_debug_level(IWL_DL_ISR)) {
+		IWL_DEBUG_ISR(trans,
+					  "ISR inta 0x%08x, enabled 0x%08x(sw), enabled(hw) 0x%08x, fh 0x%08x\n",
+					  inta, trans_pcie->inta_mask,
+					  iwl_read32(trans, CSR_INT_MASK),
+					  iwl_read32(trans, CSR_FH_INT_STATUS));
+		if (inta & (~trans_pcie->inta_mask))
+			IWL_DEBUG_ISR(trans,
+				      "We got a masked interrupt (0x%08x)\n",
+				      inta & (~trans_pcie->inta_mask));
+	}
+
+	inta &= trans_pcie->inta_mask;
+
+	/*
+	 * Ignore interrupt if there's nothing in NIC to service.
+	 * This may be due to IRQ shared with another device,
+	 * or due to sporadic interrupts thrown from our NIC.\
+	 */
 	if (!inta) {
+		IWL_DEBUG_ISR(trans, "Ignore interrupt, inta == 0\n");
+		/* Re-enable interrupts here since we don't have anything to service */
+		if (test_bit(STATUS_INT_ENABLED, &trans_pcie->status))
+			iwl_enable_interrupts(trans);
 		spin_unlock_irqrestore(&trans_pcie->irq_lock, flags);
 		return IRQ_NONE;
 	}
+
+	if ((inta == 0xFFFFFFFF) || ((inta & 0xFFFFFFF0) == 0xa5a5a5a0)) {
+		/* Hardware disappeared. It might have already raised an interrupt */
+		IWL_WARN(trans, "HARDWARE GONE?? INTA == 0x%08x\n", inta);
+	}
+
 
 	/* Ack/clear/reset pending uCode interrupts.
 	 * Note:  Some bits in CSR_INT are "OR" of bits in CSR_FH_INT_STATUS,
