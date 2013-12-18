@@ -1511,7 +1511,7 @@ struct iwl_trans *iwl_trans_pcie_alloc(struct pci_dev *pdev,
 	err = request_threaded_irq(pdev->irq, NULL, iwl_rt_irq_handler,
 				IRQF_SHARED | IRQF_ONESHOT, DRV_NAME, trans);
 #else
-	err = request_threaded_irq(pdev->irq, iwl_pcie_isr_ict,
+	err = request_threaded_irq(pdev->irq, iwl_pcie_isr,
 				   iwl_pcie_irq_handler,
 				   IRQF_SHARED, DRV_NAME, trans);
 #endif
