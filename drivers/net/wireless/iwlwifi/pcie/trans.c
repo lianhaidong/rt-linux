@@ -270,16 +270,15 @@ static void iwl_pcie_apm_stop(struct iwl_trans *trans)
 static int iwl_pcie_nic_init(struct iwl_trans *trans)
 {
 	struct iwl_trans_pcie *trans_pcie = IWL_TRANS_GET_PCIE_TRANS(trans);
-	unsigned long flags;
 
 	/* nic_init */
-	spin_lock_irqsave(&trans_pcie->irq_lock, flags);
+	spin_lock(&trans_pcie->irq_lock);
 	iwl_pcie_apm_init(trans);
 
 	/* Set interrupt coalescing calibration timer to default (512 usecs) */
 	iwl_write8(trans, CSR_INT_COALESCING, IWL_HOST_INT_CALIB_TIMEOUT_DEF);
 
-	spin_unlock_irqrestore(&trans_pcie->irq_lock, flags);
+	spin_unlock(&trans_pcie->irq_lock);
 
 	iwl_pcie_set_pwr(trans, false);
 
@@ -524,12 +523,11 @@ static void iwl_trans_pcie_fw_alive(struct iwl_trans *trans, u32 scd_addr)
 static void iwl_trans_pcie_stop_device(struct iwl_trans *trans)
 {
 	struct iwl_trans_pcie *trans_pcie = IWL_TRANS_GET_PCIE_TRANS(trans);
-	unsigned long flags;
 
 	/* tell the device to stop sending interrupts */
-	spin_lock_irqsave(&trans_pcie->irq_lock, flags);
+	spin_lock(&trans_pcie->irq_lock);
 	iwl_disable_interrupts(trans);
-	spin_unlock_irqrestore(&trans_pcie->irq_lock, flags);
+	spin_unlock(&trans_pcie->irq_lock);
 
 	/* device going down, Stop using ICT table */
 	iwl_pcie_disable_ict(trans);
@@ -561,9 +559,9 @@ static void iwl_trans_pcie_stop_device(struct iwl_trans *trans)
 	/* Upon stop, the APM issues an interrupt if HW RF kill is set.
 	 * Clean again the interrupt here
 	 */
-	spin_lock_irqsave(&trans_pcie->irq_lock, flags);
+	spin_lock(&trans_pcie->irq_lock);
 	iwl_disable_interrupts(trans);
-	spin_unlock_irqrestore(&trans_pcie->irq_lock, flags);
+	spin_unlock(&trans_pcie->irq_lock);
 
 	iwl_enable_rfkill_int(trans);
 
@@ -695,17 +693,16 @@ static void iwl_trans_pcie_stop_hw(struct iwl_trans *trans,
 {
 	struct iwl_trans_pcie *trans_pcie = IWL_TRANS_GET_PCIE_TRANS(trans);
 	bool hw_rfkill;
-	unsigned long flags;
 
-	spin_lock_irqsave(&trans_pcie->irq_lock, flags);
+	spin_lock(&trans_pcie->irq_lock);
 	iwl_disable_interrupts(trans);
-	spin_unlock_irqrestore(&trans_pcie->irq_lock, flags);
+	spin_unlock(&trans_pcie->irq_lock);
 
 	iwl_pcie_apm_stop(trans);
 
-	spin_lock_irqsave(&trans_pcie->irq_lock, flags);
+	spin_lock(&trans_pcie->irq_lock);
 	iwl_disable_interrupts(trans);
-	spin_unlock_irqrestore(&trans_pcie->irq_lock, flags);
+	spin_unlock(&trans_pcie->irq_lock);
 
 	iwl_pcie_disable_ict(trans);
 
