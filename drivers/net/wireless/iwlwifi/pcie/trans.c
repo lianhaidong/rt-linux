@@ -1378,7 +1378,7 @@ static irqreturn_t iwl_rt_irq_handler(int irq, void *dev_id)
 	irqreturn_t ret;
 
 	local_bh_disable();
-	ret = iwl_pcie_isr_ict(irq, dev_id);
+	ret = iwl_pcie_isr(irq, dev_id);
 	local_bh_enable();
 	if (ret == IRQ_WAKE_THREAD)
 		ret = iwl_pcie_irq_handler(irq, dev_id);
