@@ -16,8 +16,8 @@
 #include <linux/percpu-refcount.h>
 #include <linux/percpu-rwsem.h>
 #include <linux/workqueue.h>
-#include <linux/work-simple.h>
-
+#include <linux/swait.h>
+#include <linux/swork.h>
 #ifdef CONFIG_CGROUPS
 
 struct cgroup;
